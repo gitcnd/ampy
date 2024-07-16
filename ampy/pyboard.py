@@ -273,7 +273,6 @@ class Pyboard:
         wait=0,
         exclusive=True,
         hard_reset=False,
-        rawdelay=0,
     ):
         self.in_raw_repl = False
         self.use_raw_paste = True
@@ -311,8 +310,8 @@ class Pyboard:
                         #self.serial = serial.Serial(device, **serial_kwargs)
                         #Cannot do serial.Serial(device...) because below is only way to block a high-pulse on rts
                         self.serial = serial.Serial()
-                        self.serial.dtr = False  # DTR False = gpio0 High = Normal boot
-                        self.serial.rts = False  # RTS False = EN High = MCU enabled
+                        self.serial.dtr = 0
+                        self.serial.rts = 0
                         self.serial.port = device
                         self.serial.baudrate = serial_kwargs["baudrate"]
                         self.serial.rtscts = 0
@@ -320,7 +319,6 @@ class Pyboard:
                         self.serial.inter_byte_timeout = serial_kwargs["interCharTimeout"]
                         self.serial.exclusive = serial_kwargs["exclusive"]
                         self.serial.open()
-
 
                         if hard_reset:
                             time.sleep(0.2)
@@ -384,15 +382,20 @@ class Pyboard:
 
         # flush input (without relying on serial.flushInput())
         n = self.serial.inWaiting()
+        data = b""
         while n > 0:
-            self.serial.read(n)
+            data = data + self.serial.read(n)
             n = self.serial.inWaiting()
+
+        #cnd print("got0:{}".format(data))
 
         retry = 10
         while retry > 0:  # resend every 1s (sends get lost while resetting)
             retry = retry - 1
             self.serial.write(b"\r\x01\x01")  # ctrl-A: enter raw REPL (needs 2)
+            #cnd print("ctrl-A (enter raw REPL)")
             data = self.read_until(0, b"raw REPL; CTRL-B to exit\r\n>", timeout=1)
+            #cnd print("got1:{}".format(data))
             if data.endswith(b"raw REPL; CTRL-B to exit\r\n>"):
                 retry = 0
             else:
@@ -404,18 +407,26 @@ class Pyboard:
                 raise PyboardError("could not enter raw repl")
 
             self.serial.write(b"\x04")  # ctrl-D: soft reset
+            #cnd print("ctrl-D (soft reset)")
 
             # Waiting for "soft reboot" independently to "raw REPL" (done below)
             # allows boot.py to print, which will show up after "soft reboot"
             # and before "raw REPL".
             data = self.read_until(1, b"soft reboot\r\n")
+            #cnd print("got2:{}".format(data))
             if not data.endswith(b"soft reboot\r\n"):
-                print(data)
+                #cnd print(data)
                 raise PyboardError("could not enter raw repl")
 
-        data = self.read_until(1, b"raw REPL; CTRL-B to exit\r\n", timeout=1)
-        if not data.endswith(b"raw REPL; CTRL-B to exit\r\n"):
-            print(data)
+            #data = self.read_until(1, b"raw REPL; CTRL-B to exit\r\n", timeout=1)
+        #else:
+        #    self.serial.write(b"\r") 
+        data2 = self.read_until(0, b"raw REPL; CTRL-B to exit\r\n", timeout=3)
+        #cnd print("got3:{}".format(data2))
+
+        if not data2.endswith(b"raw REPL; CTRL-B to exit\r\n") and not data.endswith(b"raw REPL; CTRL-B to exit\r\n>"):
+            #cnd print(data)
+            #cnd print(data2)
             raise PyboardError("could not enter raw repl")
 
         self.in_raw_repl = True
