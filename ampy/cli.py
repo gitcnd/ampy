@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Adafruit MicroPython Tool - Command Line Interface
 # Author: Tony DiCola
 # Copyright (c) 2016 Adafruit Industries
@@ -85,7 +86,7 @@ def windows_full_port_name(portname):
     help="Delay in seconds before entering RAW MODE (default 0). Can optionally specify with AMPY_DELAY environment variable.",
     metavar="DELAY",
 )
-@click.version_option()
+@click.version_option(package_name='adafruit-ampy')
 def cli(port, baud, delay):
     """ampy - Adafruit MicroPython Tool
 
